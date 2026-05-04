@@ -1,0 +1,263 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Platform {
+  id    String         @id @default(auto()) @map("_id") @db.ObjectId
+  name  String
+  icon  String?
+  games GamePlatform[]
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
+model GamePlatform {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  gameId     String @db.ObjectId
+  platformId String @db.ObjectId
+
+  game     Game     @relation(fields: [gameId], references: [id])
+  platform Platform @relation(fields: [platformId], references: [id])
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
+model Genre {
+  id   String  @id @default(auto()) @map("_id") @db.ObjectId
+  name String
+  icon String?
+
+  games  GameGenre[]
+  gameId String?     @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
+model GameGenre {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  gameId  String @db.ObjectId
+  genreId String @db.ObjectId
+
+  game  Game  @relation(fields: [gameId], references: [id])
+  genre Genre @relation(fields: [genreId], references: [id])
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
+model ExternalIds {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  steamId     String?
+  epicGamesId String?
+  gogId       String?
+  gameId      String  @unique @db.ObjectId
+
+  game Game @relation(fields: [gameId], references: [id])
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
+enum Critic {
+  IGN
+  Metacritic
+  OpenCritic
+}
+
+model Rating {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  critic Critic
+  value  Int
+  gameId String @unique @db.ObjectId
+
+  game Game @relation(fields: [gameId], references: [id])
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
+model Game {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  slug           String         @unique
+  title          String
+  platforms      GamePlatform[]
+  releaseDate    DateTime?
+  genres         GameGenre[]
+  coverUrl       String?
+  bannerUrl      String?
+  Screenshots    String[]
+  description    String?
+  externalIds    ExternalIds?
+  preferedSource String?        @default("rawg")
+  ratings        Rating?
+  createdAt      DateTime       @default(now())
+  updateAt       DateTime       @updatedAt
+  userGames      UserGame[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum LinkType {
+  DISCORD
+  INSTAGRAM
+  STEAM
+  SPOTIFY
+  YOUTUBE
+}
+
+model Link {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      LinkType
+  url       String
+  profileId String   @db.ObjectId
+
+  profile Profile @relation(fields: [profileId], references: [id])
+}
+
+// Coisas do usuario
+
+enum FollowStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Follow {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  followerId  String @db.ObjectId
+  followingId String @db.ObjectId
+
+  follower  Profile @relation("following", fields: [followerId], references: [id])
+  following Profile @relation("followers", fields: [followingId], references: [id])
+
+  status FollowStatus
+
+  respondedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+model Friendship {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  requesterId String       @db.ObjectId
+  responderId String       @db.ObjectId
+  status      FriendStatus
+
+  respondedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  requester Profile @relation("sentRequests", fields: [requesterId], references: [id])
+  responder Profile @relation("receivedRequests", fields: [responderId], references: [id])
+}
+
+model Profile {
+  id               String       @id @default(auto()) @map("_id") @db.ObjectId
+  bio              String?
+  avatar           String?
+  banner           String?
+  isPublic         Boolean      @default(true)
+  followers        Follow[]     @relation("followers")
+  following        Follow[]     @relation("following")
+  sentRequests     Friendship[] @relation("sentRequests")
+  receivedRequests Friendship[] @relation("receivedRequests")
+  links            Link[]
+  userId           String       @unique @db.ObjectId
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model PlayedPlatform {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  userGameId String @db.ObjectId
+
+  userGame UserGame @relation(fields: [userGameId], references: [id])
+}
+
+enum GameStatus {
+  PLAYING
+  PLATINUM
+  COMPLETED
+  WISHLIST
+  DROPPED
+}
+
+enum GameDifficulty {
+  D
+  C
+  B
+  A
+  S
+  SS
+}
+
+model UserGame {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  playedPlatforms PlayedPlatform[]
+  status          GameStatus
+  steam           SteamData?
+  playtime        Int // em minutos
+
+  timesBeaten    Int
+  timesPlatinum  Int
+  timesCompleted Int
+
+  beatedTimestamps    DateTime[]
+  platinumTimestamps  DateTime[]
+  completedTimestamps DateTime[]
+
+  rating     UserRating?
+  comment    String?
+  favorite   Boolean        @default(false)
+  difficulty GameDifficulty
+
+  acquiredAt DateTime?
+
+  game   Game?   @relation(fields: [gameId], references: [id])
+  gameId String? @db.ObjectId
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String? @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
+model User {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  email    String  @unique
+  username String  @unique
+  password String?
+  role     Role    @default(USER)
+
+  steamId   String?
+  googleId  String?
+  discordId String?
+
+  profile Profile?
+  library UserGame[]
+}
