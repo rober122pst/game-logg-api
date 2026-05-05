@@ -206,6 +206,31 @@ enum GameStatus {
   DROPPED
 }
 
+model SteamData {
+  id                  String     @id @default(auto()) @map("_id") @db.ObjectId
+  playtimeForever     Int        @default(0) // minutos
+  lastPlayed          DateTime?
+  playtime_2weeks     Int        @default(0) // minutos
+  achievementsPercent Float      @default(0)
+  isPlatinum          Boolean    @default(false)
+  userGames           UserGame[]
+}
+
+model UserRating {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  story    Int
+  gameplay Int
+  graphics Int
+  sound    Int
+  overall  Int
+
+  userGameId String   @unique @db.ObjectId
+  userGame   UserGame @relation(fields: [userGameId], references: [id])
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
 enum GameDifficulty {
   D
   C
@@ -220,7 +245,7 @@ model UserGame {
 
   playedPlatforms PlayedPlatform[]
   status          GameStatus
-  steam           SteamData?
+  steam           SteamData?       @relation(fields: [steamDataId], references: [id])
   playtime        Int // em minutos
 
   timesBeaten    Int
@@ -243,8 +268,9 @@ model UserGame {
   user   User?   @relation(fields: [userId], references: [id])
   userId String? @db.ObjectId
 
-  createdAt DateTime @default(now())
-  updateAt  DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updateAt    DateTime @updatedAt
+  steamDataId String?  @db.ObjectId
 }
 
 model User {
@@ -260,4 +286,7 @@ model User {
 
   profile Profile?
   library UserGame[]
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
 }
