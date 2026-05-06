@@ -1,77 +1,80 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
+
 import { prisma } from "../prisma.ts";
 
-export const createUser = async (req: Request, res: Response) => {
+export const createUser = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const user = await prisma.user.create({
             data: req.body
         });
         res.status(201).json({ message: "User created successfully", userId: user.id });
     } catch (error: Error | any) {
-        res.status(400).json({ message: error.message });
+        next(error);
     }
 };
 
-export const getUsers = async (req: Request, res: Response) => {
+export const getUserById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const users = await prisma.user.findMany();
-        res.status(200).json(users);
-    } catch (error: Error | any) {
-        res.status(500).json({ message: error.message });
+        if (!req.validateId) return res.status(400).json({ message: 'Invalid user ID' });
+        const user = await prisma.user.findUnique({
+            where: { id: req.validateId },
+            select: {
+                id: true,
+                username: true,
+                profile: true,
+                library: true,
+                createdAt: true,
+            }
+        })
+
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        return res.json(user);
+    } catch (err) {
+        next(err);
     }
 };
 
-export const getUserById = async (req: Request, res: Response) => {
+export const getMe = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const userId = req.params.id;
-        // -password -email => não retornam do banco
+        const userId = req.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
                 id: true,
                 username: true,
                 profile: true,
+                library: true,
                 createdAt: true,
             }
-        })
-
-        if (!user) return res.status(404).json({ message: 'Usuário não encontrado' });
-
-        return res.json(user);
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ message: 'Erro no servidor' });
-    }
-};
-
-export const getMe = async (req: Request & { user?: { _id?: string; name?: string; profile?: any } }, res: Response) => {
-    if (req.user) {
-        res.json({
-            id: req.user._id,
-            name: req.user.name,
-            profile: req.user.profile
         });
-    } else {
-        return res.status(401).json({ message: 'Usuário não autenticado' });
+
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        res.json(user);
+    } catch (error) {
+        next(error);
     }
 }
-export const checkEmailExists = async (req: Request, res: Response) => {
-    try {
-        const { email } = req.body;
+// export const checkEmailExists = async (req: Request, res: Response) => {
+//     try {
+//         const { email } = req.body;
 
-        if (!email) {
-            return res.status(400).json({ message: "Email é obrigatório." });
-        }
+//         if (!email) {
+//             return res.status(400).json({ message: "Email é obrigatório." });
+//         }
 
-        const user = await User.findOne({ email });
+//         const user = await User.findOne({ email });
 
-        if (user) {
-            return res.status(200).json({ exists: true, message: "Email já cadastrado." });
-        } else {
-            return res.status(200).json({ exists: false, message: "Verified" });
-        }
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Erro no servidor." });
-    }
-};
+//         if (user) {
+//             return res.status(200).json({ exists: true, message: "Email já cadastrado." });
+//         } else {
+//             return res.status(200).json({ exists: false, message: "Verified" });
+//         }
+//     } catch (err) {
+//         console.error(err);
+//         return res.status(500).json({ message: "Erro no servidor." });
+//     }
+// };

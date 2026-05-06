@@ -6,3 +6,8 @@ declare module "express-serve-static-core" {
         userId?: string;
     }
 }
+
+export interface MyQuery {
+    gameId?: string;
+    favorite?: string;
+}
