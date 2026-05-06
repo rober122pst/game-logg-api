@@ -15,22 +15,14 @@ datasource db {
 }
 
 model Platform {
-  id    String         @id @default(auto()) @map("_id") @db.ObjectId
-  name  String
-  icon  String?
-  games GamePlatform[]
-
-  createdAt DateTime @default(now())
-  updateAt  DateTime @updatedAt
-}
-
-model GamePlatform {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  gameId     String @db.ObjectId
-  platformId String @db.ObjectId
-
-  game     Game     @relation(fields: [gameId], references: [id])
-  platform Platform @relation(fields: [platformId], references: [id])
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  icon       String?
+  gameId     String[]     @db.ObjectId
+  games      Game[]       @relation(fields: [gameId], references: [id])
+  userGame   UserGame[]   @relation(fields: [userGameId], references: [id])
+  userGameId String[]     @db.ObjectId
+  beatEvents BeatEvents[]
 
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
@@ -41,36 +33,17 @@ model Genre {
   name String
   icon String?
 
-  games  GameGenre[]
-  gameId String?     @db.ObjectId
+  gameIds String[] @db.ObjectId
+  games   Game[]   @relation(fields: [gameIds], references: [id])
 
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
 }
 
-model GameGenre {
-  id      String @id @default(auto()) @map("_id") @db.ObjectId
-  gameId  String @db.ObjectId
-  genreId String @db.ObjectId
-
-  game  Game  @relation(fields: [gameId], references: [id])
-  genre Genre @relation(fields: [genreId], references: [id])
-
-  createdAt DateTime @default(now())
-  updateAt  DateTime @updatedAt
-}
-
-model ExternalIds {
-  id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  steamId     String?
-  epicGamesId String?
-  gogId       String?
-  gameId      String  @unique @db.ObjectId
-
-  game Game @relation(fields: [gameId], references: [id])
-
-  createdAt DateTime @default(now())
-  updateAt  DateTime @updatedAt
+type ExternalIds {
+  steamId String?
+  rawg    String?
+  igdb    String?
 }
 
 enum Critic {
@@ -79,34 +52,31 @@ enum Critic {
   OpenCritic
 }
 
-model Rating {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId
-  critic Critic
-  value  Int
-  gameId String @unique @db.ObjectId
-
-  game Game @relation(fields: [gameId], references: [id])
-
-  createdAt DateTime @default(now())
-  updateAt  DateTime @updatedAt
+type Rating {
+  name    Critic
+  score   Int?
+  iconUrl String?
+  link    String?
 }
 
 model Game {
-  id             String         @id @default(auto()) @map("_id") @db.ObjectId
-  slug           String         @unique
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  slug           String       @unique
   title          String
-  platforms      GamePlatform[]
+  platformIds    String[]     @db.ObjectId
+  platforms      Platform[]   @relation(fields: [platformIds], references: [id])
   releaseDate    DateTime?
-  genres         GameGenre[]
+  genreIds       String[]     @db.ObjectId
+  genres         Genre[]      @relation(fields: [genreIds], references: [id])
   coverUrl       String?
   bannerUrl      String?
   Screenshots    String[]
   description    String?
   externalIds    ExternalIds?
-  preferedSource String?        @default("rawg")
-  ratings        Rating?
-  createdAt      DateTime       @default(now())
-  updateAt       DateTime       @updatedAt
+  preferedSource String?      @default("rawg")
+  ratings        Rating[]
+  createdAt      DateTime     @default(now())
+  updateAt       DateTime     @updatedAt
   userGames      UserGame[]
 }
 
@@ -123,13 +93,10 @@ enum LinkType {
   YOUTUBE
 }
 
-model Link {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      LinkType
-  url       String
-  profileId String   @db.ObjectId
-
-  profile Profile @relation(fields: [profileId], references: [id])
+type Link {
+  name    LinkType
+  url     String
+  iconUrl String?
 }
 
 // Coisas do usuario
@@ -190,14 +157,6 @@ model Profile {
   user User @relation(fields: [userId], references: [id])
 }
 
-model PlayedPlatform {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  name       String
-  userGameId String @db.ObjectId
-
-  userGame UserGame @relation(fields: [userGameId], references: [id])
-}
-
 enum GameStatus {
   PLAYING
   PLATINUM
@@ -206,14 +165,12 @@ enum GameStatus {
   DROPPED
 }
 
-model SteamData {
-  id                  String     @id @default(auto()) @map("_id") @db.ObjectId
-  playtimeForever     Int        @default(0) // minutos
+type SteamData {
+  playtimeForever     Int       @default(0) // minutos
   lastPlayed          DateTime?
-  playtime_2weeks     Int        @default(0) // minutos
-  achievementsPercent Float      @default(0)
-  isPlatinum          Boolean    @default(false)
-  userGames           UserGame[]
+  playtime_2weeks     Int       @default(0) // minutos
+  achievementsPercent Float     @default(0)
+  isPlatinum          Boolean   @default(false)
 }
 
 model UserRating {
@@ -240,21 +197,36 @@ enum GameDifficulty {
   SS
 }
 
+enum BeatAction {
+  BEAT
+  PLATINUM
+  COMPLETE
+}
+
+model BeatEvents {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userGame   UserGame?  @relation(fields: [userGameId], references: [id])
+  userGameId String?    @db.ObjectId
+  action     BeatAction
+  platformId String     @db.ObjectId
+  platform   Platform   @relation(fields: [platformId], references: [id])
+
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+
 model UserGame {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  playedPlatforms PlayedPlatform[]
+  platformIds     String[]   @db.ObjectId
+  playedPlatforms Platform[] @relation(fields: [platformIds], references: [id])
   status          GameStatus
-  steam           SteamData?       @relation(fields: [steamDataId], references: [id])
+  steam           SteamData?
   playtime        Int // em minutos
 
-  timesBeaten    Int
-  timesPlatinum  Int
-  timesCompleted Int
-
-  beatedTimestamps    DateTime[]
-  platinumTimestamps  DateTime[]
-  completedTimestamps DateTime[]
+  beatEvents BeatEvents[]
 
   rating     UserRating?
   comment    String?
@@ -268,9 +240,8 @@ model UserGame {
   user   User?   @relation(fields: [userId], references: [id])
   userId String? @db.ObjectId
 
-  createdAt   DateTime @default(now())
-  updateAt    DateTime @updatedAt
-  steamDataId String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
 }
 
 model User {
