@@ -6,13 +6,13 @@ import { prisma } from '../prisma.ts';
 export const createUserGame = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const userId = req.userId;
-        if (!userId) return res.status(403).json({ message: "Unauthorized" });
+        if (!userId) return res.status(403).json({ message: 'Unauthorized' });
 
         const userGame = await prisma.userGame.create({
             data: {
                 ...req.body,
-                userId
-            }
+                userId,
+            },
         });
         res.status(201).json(userGame);
     } catch (error) {
@@ -23,11 +23,11 @@ export const createUserGame = async (req: Request, res: Response, next: NextFunc
 export const getUserGames = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { userId } = req.params;
-        if (!userId || Array.isArray(userId)) return res.status(400).json({ message: "Invalid user id" });
+        if (!userId || Array.isArray(userId)) return res.status(400).json({ message: 'Invalid user id' });
 
         const { gameId, favorite } = req.query as unknown as MyQuery;
 
-        let query: { userId: string; favorite?: boolean; gameId?: string } = { userId };
+        const query: { userId: string; favorite?: boolean; gameId?: string } = { userId };
 
         if (favorite !== undefined) {
             query.favorite = favorite === 'true';
@@ -41,14 +41,14 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
             select: {
                 library: {
                     where: {
-                        ...query
-                    }
-                }
-            }
-        })
+                        ...query,
+                    },
+                },
+            },
+        });
 
         if (!library) {
-            return res.status(404).json({ message: "User not found" });
+            return res.status(404).json({ message: 'User not found' });
         }
 
         res.status(200).json(library.library);
@@ -120,8 +120,6 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
 //     }
 // }
 
-
-
 // List all user Games
 // module.exports = {
 
@@ -152,7 +150,7 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
 //             }
 //         } catch (error){
 //                 res.status(400).json({message: error.message});
-//         };  
+//         };
 //     },
 //     async delete(req, res){
 //         try{

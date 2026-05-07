@@ -20,6 +20,10 @@
     ],
     // and npm install -D @types/node
     "allowImportingTsExtensions": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ],
     // Other Outputs
     "emitDeclarationOnly": true,
     "sourceMap": true,

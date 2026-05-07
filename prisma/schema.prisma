@@ -143,6 +143,7 @@ model Friendship {
 
 model Profile {
   id               String       @id @default(auto()) @map("_id") @db.ObjectId
+  displayName      String
   bio              String?
   avatar           String?
   banner           String?
@@ -246,14 +247,14 @@ model UserGame {
 
 model User {
   id       String  @id @default(auto()) @map("_id") @db.ObjectId
-  email    String  @unique
+  email    String? @unique
   username String  @unique
   password String?
   role     Role    @default(USER)
 
-  steamId   String?
-  googleId  String?
-  discordId String?
+  steamId   String? @unique
+  googleId  String? @unique
+  discordId String? @unique
 
   profile Profile?
   library UserGame[]

@@ -1,9 +1,13 @@
-import "express";
+import 'express';
 
-declare module "express-serve-static-core" {
+declare module 'express-serve-static-core' {
     interface Request {
-        validateId?: string;
+        validatedId?: string;
         userId?: string;
+    }
+
+    interface User {
+        id?: string;
     }
 }
 

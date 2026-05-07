@@ -1,31 +1,31 @@
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from 'express';
 
-import { prisma } from "../prisma.ts";
+import { prisma } from '../prisma.ts';
 
 export const createUser = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const user = await prisma.user.create({
-            data: req.body
+            data: req.body,
         });
-        res.status(201).json({ message: "User created successfully", userId: user.id });
-    } catch (error: Error | any) {
+        res.status(201).json({ message: 'User created successfully', userId: user.id });
+    } catch (error) {
         next(error);
     }
 };
 
 export const getUserById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.validateId) return res.status(400).json({ message: 'Invalid user ID' });
+        if (!req.validatedId) return res.status(400).json({ message: 'Invalid user ID' });
         const user = await prisma.user.findUnique({
-            where: { id: req.validateId },
+            where: { id: req.validatedId },
             select: {
                 id: true,
                 username: true,
                 profile: true,
                 library: true,
                 createdAt: true,
-            }
-        })
+            },
+        });
 
         if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -38,7 +38,7 @@ export const getUserById = async (req: Request, res: Response, next: NextFunctio
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const userId = req.userId;
-        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
         const user = await prisma.user.findUnique({
             where: { id: userId },
@@ -48,16 +48,16 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
                 profile: true,
                 library: true,
                 createdAt: true,
-            }
+            },
         });
 
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user) return res.status(404).json({ message: 'User not found' });
 
         res.json(user);
     } catch (error) {
         next(error);
     }
-}
+};
 // export const checkEmailExists = async (req: Request, res: Response) => {
 //     try {
 //         const { email } = req.body;
