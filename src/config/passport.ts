@@ -1,7 +1,8 @@
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { Strategy as SteamStrategy } from 'passport-steam';
 import dotenv from 'dotenv';
 import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as SteamStrategy } from 'passport-steam';
+import type { User } from '../../generated/prisma/client.ts';
 import { prisma } from '../prisma.ts';
 
 dotenv.config();
@@ -126,7 +127,7 @@ passport.use(
 );
 
 passport.serializeUser((user, done) => {
-    done(null, user);
+    done(null, (user as User).id);
 });
 
 passport.deserializeUser(async (id: string, done) => {

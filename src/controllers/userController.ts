@@ -37,7 +37,7 @@ export const getUserById = async (req: Request, res: Response, next: NextFunctio
 
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const userId = req.userId;
+        const userId = req.user?.id;
         if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
         const user = await prisma.user.findUnique({
