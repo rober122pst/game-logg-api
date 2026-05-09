@@ -21,7 +21,7 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
             data: {
                 username: name,
                 email,
-                passwordHash,
+                password: passwordHash,
                 profile: {
                     create: {
                         displayName: name,
