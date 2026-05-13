@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 
 import bcrypt from 'bcrypt';
-import { prisma } from '../prisma.ts';
 import { generateToken } from './tokenService.ts';
+import { prisma } from '../prisma.ts';
 
 //                    Registro via Email
 export const registerUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -38,7 +38,8 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
             sameSite: 'strict',
         });
         return res.status(200).json({
-            message: 'Login successful.',
+            message: 'Register successful.',
+            token,
             id: user.id,
             name: user.username,
         });
@@ -67,6 +68,7 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
         });
         return res.status(200).json({
             message: 'Login successful.',
+            token,
             id: user.id,
             name: user.username,
         });
