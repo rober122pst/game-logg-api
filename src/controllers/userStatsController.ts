@@ -1,32 +1,47 @@
 // // controllers/userStatsController.js
-// import UserStats from "../models/userStats.js";
-// import type { Request, Response, NextFunction } from "express";
+
+import type { NextFunction, Request, Response } from 'express';
+
+import { prisma } from '../prisma.ts';
 
 // // pegar estatísticas completas para exibir no profile
-// export const getProfileStats = async (req: Request, res: Response, next: NextFunction) => {
-//   try {
-//     const { userId } = req.params;
-//     const stats = await UserStats.findOne({ userId }).lean();
+export const getProfileStats = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.validatedId) return res.status(400).json({ message: 'User ID is required' });
+        const userId = req.validatedId;
 
-//     if (!stats) {
-//       return res.status(404).json({ message: "Nenhuma estatística encontrada." });
-//     }
+        const beatedGames = await prisma.userGame.count({
+            where: {
+                userId,
+                beatEvents: {
+                    some: {
+                        action: 'BEAT',
+                    },
+                },
+            },
+        });
 
-//     // calcular total de gastos
-//     const totalExpenses = stats.expenses.reduce((acc, e) => acc + e.amount, 0);
+        const platinumGames = await prisma.userGame.count({
+            where: {
+                userId,
+                beatEvents: {
+                    some: {
+                        action: 'PLATINUM',
+                    },
+                },
+            },
+        });
 
-//     res.json({
-//       hoursByYear: stats.hoursByYear,
-//       totalHours: Object.values(stats.hoursByYear).reduce((a, b) => a + b, 0),
-//       gamesCompleted: stats.gamesCompleted,
-//       totalGamesCompleted: stats.gamesCompleted.length,
-//       expenses: stats.expenses,
-//       totalExpenses
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
+        const totalPlaytime = await prisma.userGame.aggregate({
+            where: { userId },
+            _sum: { playtime: true },
+        });
+
+        res.json({ beatedGames, platinumGames, totalPlaytime: totalPlaytime._sum.playtime || 0 });
+    } catch (error) {
+        next(error);
+    }
+};
 
 // // adicionar horas
 // export const addHours = async (req, res) => {

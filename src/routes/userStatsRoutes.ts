@@ -1,11 +1,12 @@
 // // routes/userStatsRoutes.js
-// import express from 'express';
-// import { addCompletedGame, addHours, getProfileStats } from '../controllers/userStatsController.js';
 
-// const router = express.Router();
+import express from 'express';
+import { getProfileStats } from '../controllers/userStatsController.ts';
 
-// router.get('/profile/:userId', getProfileStats); // estatísticas do usuário
+const router = express.Router();
+
+router.get('/', getProfileStats); // estatísticas do usuário
 // router.post('/hours', addHours); // adicionar horas
 // router.post('/completed-game', addCompletedGame); // adicionar jogo zerado
 
-// export default router;
+export default router;
