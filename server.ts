@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
-import mongoose from 'mongoose';
 
 import routes from './src/routes/routes.ts';
 
@@ -45,11 +44,5 @@ if (!process.env.MONGODB_KEY) {
     process.exit(1);
 }
 
-//  conexão MongoDB
-mongoose
-    .connect(process.env.MONGODB_KEY)
-    .then(() => console.log('Connected to Database'))
-    .catch((err) => console.error('Erro MongoDB:', err));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const PORT = Number(process.env.PORT) || 3000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
