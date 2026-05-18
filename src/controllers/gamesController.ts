@@ -2,73 +2,73 @@ import apicalypse from 'apicalypse';
 import type { NextFunction, Request, Response } from 'express';
 
 import { prisma } from '../prisma.ts';
+import { createGameWithIGDB } from '../services/gamesServices.ts';
 import { requestOptions } from '../utils/requestOptions.ts';
 
 export const createGame = async (req: Request, res: Response, next: NextFunction) => {
+    console.log(process.env.TWITCH_ACCESS_TOKEN, process.env.TWITCH_CLIENT_ID);
     try {
-        const gameData = req.body as { gameName: string };
-        gameData.gameName = gameData.gameName.trim();
+        if (!req.validatedId) return res.status(400).json({ message: 'Game id is required' });
 
-        if (!gameData.gameName) return res.status(400).json({ message: 'Game name is required' });
-
-        type IGDBGame = {
-            id: string;
-            slug: string;
-            name: string;
-            platforms: string[];
-            first_release_date: string;
-            genres: string[];
-            cover: string;
-            screenshots: string[];
-            storyline: string;
-            rating: number;
-        };
-
-        const igdbResponse = await apicalypse(requestOptions)
-            .fields(
-                'slug,name,platforms.name,first_release_date,genres.name,cover,screenshots.image_id,storyline,rating'
-            )
-            .limit(1)
-            .search(gameData.gameName)
-            .request('/games');
-
-        console.log(igdbResponse.data);
-
-        if (!igdbResponse.data) return res.status(404).json({ message: 'Game not found in IGDB' });
-
-        const igdbGame = igdbResponse.data[0] as IGDBGame;
-
-        const gameArtworksResponse = await apicalypse(requestOptions)
-            .fields('image_id')
-            .where(`game = ${igdbGame.id} & artwork_type = 2`)
-            .request('/artworks');
-
-        const game = await prisma.game.create({
-            data: {
-                slug: igdbGame.slug,
-                title: igdbGame.name,
-                releaseDate: igdbGame.first_release_date,
-                coverUrl: igdbGame.cover,
-                bannerUrl: gameArtworksResponse.data[0],
-                Screenshots: igdbGame.screenshots,
-                description: igdbGame.storyline,
-                externalIds: {
-                    igdb: igdbGame.id,
-                },
-                preferedSource: 'igdb',
-                ratings: [
-                    {
-                        name: 'IGN',
-                        score: igdbGame.rating,
-                    },
-                ],
+        const existedGame = await prisma.game.findUnique({
+            where: {
+                igdbId: Number(req.validatedId),
             },
         });
 
-        res.status(200).json({
-            message: 'Jogo criado com sucesso',
-            game,
+        if (existedGame) return res.status(200).json({ message: 'Game already exists', game: existedGame });
+
+        const { data, status } = await createGameWithIGDB(Number(req.validatedId));
+
+        res.status(status).json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getGameSuggestions = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const query = req.query.q as string;
+        if (!query || query.length < 3) return res.json([]);
+
+        const igdbResponse = await apicalypse(requestOptions)
+            .fields('id, name, slug, cover.image_id, total_rating_count, game_type.*')
+            .where('game_modes = (1) & (game_type = 0 | game_type = 8) & total_rating_count > 0') // Somente jogos singleplayer
+            .search(query)
+            .limit(50)
+            .request('/games');
+
+        const igdbGames = igdbResponse.data || [];
+
+        igdbGames.sort((a: { total_rating_count: number }, b: { total_rating_count: number }) => {
+            const ratingA = a.total_rating_count || 0;
+            const ratingB = b.total_rating_count || 0;
+            return ratingB - ratingA;
         });
+
+        const topGames = igdbGames.slice(0, 5);
+
+        const suggestions = topGames.map(
+            (game: {
+                id: number;
+                name: string;
+                slug: string;
+                cover: { image_id: string };
+                total_rating_count: number;
+                game_type: { type: string };
+            }) => ({
+                igdbId: game.id,
+                title: game.name,
+                slug: game.slug,
+                coverUrl: game.cover
+                    ? `https://images.igdb.com/igdb/image/upload/t_cover_small/${game.cover.image_id}.jpg`
+                    : null,
+                totalRatingCount: game.total_rating_count,
+                game_type: game.game_type.type,
+            })
+        );
+
+        return res.status(200).json(suggestions);
     } catch (error) {
         next(error);
     }
