@@ -1,8 +1,8 @@
-import apicalypse from 'apicalypse';
 import type { NextFunction, Request, Response } from 'express';
 
-import { prisma } from '../prisma.ts';
+import apicalypse from 'apicalypse';
 import { createGameWithIGDB } from '../services/gamesServices.ts';
+import { prisma } from '../prisma.ts';
 import { requestOptions } from '../utils/requestOptions.ts';
 
 export const createGame = async (req: Request, res: Response, next: NextFunction) => {
@@ -76,7 +76,11 @@ export const getGameSuggestions = async (req: Request, res: Response, next: Next
 
 export const getGames = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const games = await prisma.game.findMany();
+        const take = req.query.take ?? 10;
+
+        const games = await prisma.game.findMany({
+            take: Number(take),
+        });
         res.status(200).json(games);
     } catch (error) {
         next(error);
