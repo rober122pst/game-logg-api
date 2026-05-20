@@ -1,19 +1,15 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import { prisma } from '../prisma.ts';
 import type { MyQuery } from '../types/index.js';
+import { createUserGameService } from '../services/userGamesServices.ts';
+import { prisma } from '../prisma.ts';
 
 export const createUserGame = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(403).json({ message: 'Unauthorized' });
 
-        const userGame = await prisma.userGame.create({
-            data: {
-                ...req.body,
-                userId,
-            },
-        });
+        const userGame = await createUserGameService(req.body, req.body.rating);
         res.status(201).json(userGame);
     } catch (error) {
         next(error);

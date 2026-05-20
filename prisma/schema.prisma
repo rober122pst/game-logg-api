@@ -161,6 +161,7 @@ model Profile {
 
 enum GameStatus {
   PLAYING
+  BEATED
   PLATINUM
   COMPLETED
   WISHLIST
@@ -181,7 +182,6 @@ model UserRating {
   gameplay Int
   graphics Int
   sound    Int
-  overall  Int
 
   userGameId String   @unique @db.ObjectId
   userGame   UserGame @relation(fields: [userGameId], references: [id])
@@ -201,8 +201,16 @@ enum GameDifficulty {
 
 enum BeatAction {
   BEAT
+  TOTAL_PERCENT
   PLATINUM
   COMPLETE
+}
+
+enum DatePrecision {
+  YEAR
+  MONTH
+  DAY
+  HOUR
 }
 
 model BeatEvents {
@@ -210,11 +218,14 @@ model BeatEvents {
 
   userGame   UserGame?  @relation(fields: [userGameId], references: [id])
   userGameId String?    @db.ObjectId
-  action     BeatAction
+  action     BeatAction @default(BEAT)
   platformId String     @db.ObjectId
   platform   Platform   @relation(fields: [platformId], references: [id])
 
-  date      DateTime @default(now())
+  occurredAtStart DateTime?
+  occurredAtEnd   DateTime?
+  precision       DatePrecision @default(YEAR)
+
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
 }
