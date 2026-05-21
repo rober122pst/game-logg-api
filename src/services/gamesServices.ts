@@ -24,8 +24,6 @@ export async function createGameWithIGDB(igdbId: number) {
         .where(`id = ${igdbId}`)
         .request('/games');
 
-    console.log(igdbResponse.data);
-
     if (!igdbResponse.data) return { data: { message: 'Game not found in IGDB' }, status: 404 };
 
     const igdbGame = igdbResponse.data[0] as IGDBGame;
@@ -104,6 +102,10 @@ export async function createGameWithIGDB(igdbId: number) {
             genres: {
                 connect: genres.map((g) => ({ slug: g.slug })),
             },
+        },
+        include: {
+            platforms: true,
+            genres: true,
         },
     });
     return {

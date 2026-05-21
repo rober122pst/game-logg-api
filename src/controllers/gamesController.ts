@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 
 import apicalypse from 'apicalypse';
-import { createGameWithIGDB } from '../services/gamesServices.ts';
 import { prisma } from '../prisma.ts';
+import { createGameWithIGDB } from '../services/gamesServices.ts';
 import { requestOptions } from '../utils/requestOptions.ts';
 
 export const createGame = async (req: Request, res: Response, next: NextFunction) => {
@@ -14,11 +14,19 @@ export const createGame = async (req: Request, res: Response, next: NextFunction
             where: {
                 igdbId: Number(req.validatedId),
             },
+            include: {
+                platforms: true,
+                genres: true,
+            },
         });
+
+        console.log(existedGame);
 
         if (existedGame) return res.status(200).json({ message: 'Game already exists', game: existedGame });
 
         const { data, status } = await createGameWithIGDB(Number(req.validatedId));
+
+        console.log(data);
 
         res.status(status).json(data);
     } catch (error) {
