@@ -25,8 +25,9 @@ model Platform {
   userGameId String[]     @db.ObjectId
   beatEvents BeatEvents[]
 
-  createdAt DateTime @default(now())
-  updateAt  DateTime @updatedAt
+  createdAt      DateTime         @default(now())
+  updateAt       DateTime         @updatedAt
+  PlayedPlatform PlayedPlatform[]
 }
 
 model Genre {
@@ -168,6 +169,12 @@ enum GameStatus {
   DROPPED
 }
 
+enum Objective {
+  BEAT
+  PLATINUM
+  COMPLETE
+}
+
 type SteamData {
   playtimeForever     Int       @default(0) // minutos
   lastPlayed          DateTime?
@@ -216,18 +223,44 @@ enum DatePrecision {
 model BeatEvents {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  userGame   UserGame?  @relation(fields: [userGameId], references: [id])
-  userGameId String?    @db.ObjectId
+  userGame   UserGame   @relation(fields: [userGameId], references: [id], onDelete: Cascade)
+  userGameId String     @db.ObjectId
   action     BeatAction @default(BEAT)
   platformId String     @db.ObjectId
-  platform   Platform   @relation(fields: [platformId], references: [id])
+  platform   Platform   @relation(fields: [platformId], references: [id], onDelete: Cascade)
 
   occurredAtStart DateTime?
   occurredAtEnd   DateTime?
   precision       DatePrecision @default(YEAR)
 
+  timeToEvent Int?
+
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
+}
+
+model PlayedPlatform {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  platformId String   @db.ObjectId
+  platform   Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  userGameId String   @db.ObjectId
+  UserGame   UserGame @relation(fields: [userGameId], references: [id])
+
+  totalMinutes  Int @default(0)
+  totalSessions Int @default(0)
+
+  sessions GameSession[]
+}
+
+model GameSession {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  playedPlatform   PlayedPlatform @relation(fields: [playedPlatformId], references: [id], onDelete: Cascade)
+  playedPlatformId String         @db.ObjectId
+
+  sessionDate DateTime
+  playedMins  Int
 }
 
 model UserGame {
@@ -237,24 +270,26 @@ model UserGame {
   playedPlatforms Platform[] @relation(fields: [platformIds], references: [id])
   status          GameStatus
   steam           SteamData?
-  playtime        Int // em minutos
 
   beatEvents BeatEvents[]
+  objective  Objective
 
   rating     UserRating?
   comment    String?
-  favorite   Boolean        @default(false)
-  difficulty GameDifficulty
+  favorite   Boolean         @default(false)
+  difficulty GameDifficulty?
 
   acquiredAt DateTime?
+  price      Int?
 
-  game   Game?   @relation(fields: [gameId], references: [id])
+  game   Game?   @relation(fields: [gameId], references: [id], onDelete: Cascade)
   gameId String? @db.ObjectId
-  user   User?   @relation(fields: [userId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String? @db.ObjectId
 
-  createdAt DateTime @default(now())
-  updateAt  DateTime @updatedAt
+  createdAt      DateTime         @default(now())
+  updateAt       DateTime         @updatedAt
+  PlayedPlatform PlayedPlatform[]
 }
 
 model User {
