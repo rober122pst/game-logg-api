@@ -15,7 +15,7 @@ export const getProfileStats = async (req: Request, res: Response, next: NextFun
                 userId,
                 beatEvents: {
                     some: {
-                        action: 'BEAT',
+                        action: 'BEATED',
                     },
                 },
             },
@@ -32,12 +32,12 @@ export const getProfileStats = async (req: Request, res: Response, next: NextFun
             },
         });
 
-        const totalPlaytime = await prisma.userGame.aggregate({
-            where: { userId },
-            _sum: { playtime: true },
+        const totalPlaytime = await prisma.beatEvents.aggregate({
+            where: { userGame: { userId } },
+            _sum: { timeToEvent: true },
         });
 
-        res.json({ beatedGames, platinumGames, totalPlaytime: totalPlaytime._sum.playtime || 0 });
+        res.json({ beatedGames, platinumGames, totalPlaytime: totalPlaytime._sum.timeToEvent || 0 });
     } catch (error) {
         next(error);
     }

@@ -1,15 +1,24 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import type { MyQuery } from '../types/index.js';
-import { createUserGameService } from '../services/userGamesServices.ts';
 import { prisma } from '../prisma.ts';
+import { createUserGameService } from '../services/userGamesServices.ts';
+import type { MyQuery } from '../types/index.js';
 
 export const createUserGame = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const userId = req.user?.id;
-        if (!userId) return res.status(403).json({ message: 'Unauthorized' });
+        if (!req.validatedId) return res.status(403).json({ message: 'Unauthorized' });
 
-        const userGame = await createUserGameService(req.body, req.body.rating);
+        const userId = req.validatedId;
+
+        if (userId !== req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
+
+        if (req.body.status !== 'PLAYING' && req.body.status !== 'DROPPED') {
+            if (!req.body.beatEvents || req.body.beatEvents.length === 0) {
+                return res.status(400).json({ message: 'Beat Events missing.' });
+            }
+        }
+
+        const userGame = await createUserGameService(userId, req.body, req.body.beatEvents[0]);
         res.status(201).json(userGame);
     } catch (error) {
         next(error);

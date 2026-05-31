@@ -74,7 +74,9 @@ export async function createGameWithIGDB(igdbId: number) {
         data: {
             slug: igdbGame.slug,
             title: igdbGame.name,
-            alternativeTitles: igdbGame.alternative_names.map((n) => n.name).filter(Boolean),
+            alternativeTitles: igdbGame.alternative_names
+                ? igdbGame.alternative_names.map((n) => n.name).filter(Boolean)
+                : [],
             releaseDate: new Date(igdbGame.first_release_date * 1000),
             coverUrl: igdbGame.cover.image_id
                 ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${igdbGame.cover.image_id}.jpg`

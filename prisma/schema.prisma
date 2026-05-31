@@ -21,8 +21,6 @@ model Platform {
   icon       String?
   gameId     String[]     @db.ObjectId
   games      Game[]       @relation(fields: [gameId], references: [id])
-  userGame   UserGame[]   @relation(fields: [userGameId], references: [id])
-  userGameId String[]     @db.ObjectId
   beatEvents BeatEvents[]
 
   createdAt      DateTime         @default(now())
@@ -163,16 +161,17 @@ model Profile {
 enum GameStatus {
   PLAYING
   BEATED
-  PLATINUM
   COMPLETED
-  WISHLIST
+  PLATINUM
+  PERFECT
   DROPPED
 }
 
 enum Objective {
   BEAT
+  COMPLETION
   PLATINUM
-  COMPLETE
+  PERFECT
 }
 
 type SteamData {
@@ -207,10 +206,10 @@ enum GameDifficulty {
 }
 
 enum BeatAction {
-  BEAT
-  TOTAL_PERCENT
+  BEATED
+  COMPLETED
   PLATINUM
-  COMPLETE
+  PERFECT
 }
 
 enum DatePrecision {
@@ -225,7 +224,7 @@ model BeatEvents {
 
   userGame   UserGame   @relation(fields: [userGameId], references: [id], onDelete: Cascade)
   userGameId String     @db.ObjectId
-  action     BeatAction @default(BEAT)
+  action     BeatAction @default(BEATED)
   platformId String     @db.ObjectId
   platform   Platform   @relation(fields: [platformId], references: [id], onDelete: Cascade)
 
@@ -233,7 +232,7 @@ model BeatEvents {
   occurredAtEnd   DateTime?
   precision       DatePrecision @default(YEAR)
 
-  timeToEvent Int?
+  timeToEvent Int? @default(0)
 
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
@@ -242,15 +241,19 @@ model BeatEvents {
 model PlayedPlatform {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  platformId String   @db.ObjectId
-  platform   Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
-  userGameId String   @db.ObjectId
-  UserGame   UserGame @relation(fields: [userGameId], references: [id])
+  platformId  String     @db.ObjectId
+  platform    Platform   @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  userGameIds String[]   @db.ObjectId
+  userGames   UserGame[] @relation(fields: [userGameIds], references: [id])
+  userId      String     @db.ObjectId
+  user        User       @relation(fields: [userId], references: [id])
 
   totalMinutes  Int @default(0)
   totalSessions Int @default(0)
 
   sessions GameSession[]
+
+  @@unique([userId, platformId])
 }
 
 model GameSession {
@@ -266,8 +269,8 @@ model GameSession {
 model UserGame {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  platformIds     String[]   @db.ObjectId
-  playedPlatforms Platform[] @relation(fields: [platformIds], references: [id])
+  platformIds     String[]         @db.ObjectId
+  playedPlatforms PlayedPlatform[] @relation(fields: [platformIds], references: [id])
   status          GameStatus
   steam           SteamData?
 
@@ -282,14 +285,15 @@ model UserGame {
   acquiredAt DateTime?
   price      Int?
 
-  game   Game?   @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  gameId String? @db.ObjectId
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String? @db.ObjectId
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @db.ObjectId
 
-  createdAt      DateTime         @default(now())
-  updateAt       DateTime         @updatedAt
-  PlayedPlatform PlayedPlatform[]
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+
+  @@unique([userId, gameId])
 }
 
 model User {
@@ -303,8 +307,9 @@ model User {
   googleId  String? @unique
   discordId String? @unique
 
-  profile Profile?
-  library UserGame[]
+  profile         Profile?
+  library         UserGame[]
+  playedPlatforms PlayedPlatform[]
 
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
