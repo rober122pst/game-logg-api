@@ -1,6 +1,6 @@
 import 'express';
 
-import type { User as PrismaUser } from '../../generated/prisma/client.ts';
+import type { GameStatus, User as PrismaUser } from '../../generated/prisma/client.ts';
 
 declare module 'express-serve-static-core' {
     interface Request {
@@ -17,4 +17,5 @@ declare module 'express-serve-static-core' {
 export interface MyQuery {
     gameId?: string;
     favorite?: string;
+    status?: GameStatus;
 }

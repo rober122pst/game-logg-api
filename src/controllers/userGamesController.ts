@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
+import type { GameStatus } from '../../generated/prisma/enums.ts';
 import { prisma } from '../prisma.ts';
 import { createUserGameService } from '../services/userGamesServices.ts';
 import type { MyQuery } from '../types/index.js';
@@ -27,18 +28,22 @@ export const createUserGame = async (req: Request, res: Response, next: NextFunc
 
 export const getUserGames = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { userId } = req.params;
-        if (!userId || Array.isArray(userId)) return res.status(400).json({ message: 'Invalid user id' });
+        if (!req.validatedId) return res.status(400).json({ message: 'Invalid user id' });
 
-        const { gameId, favorite } = req.query as unknown as MyQuery;
+        const userId = req.validatedId;
 
-        const query: { userId: string; favorite?: boolean; gameId?: string } = { userId };
+        const { gameId, favorite, status } = req.query as unknown as MyQuery;
+
+        const query: { userId: string; favorite?: boolean; gameId?: string; status?: GameStatus } = { userId };
 
         if (favorite !== undefined) {
             query.favorite = favorite === 'true';
         }
         if (gameId) {
             query.gameId = gameId;
+        }
+        if (status) {
+            query.status = status;
         }
 
         const library = await prisma.user.findUnique({
@@ -47,6 +52,14 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
                 library: {
                     where: {
                         ...query,
+                    },
+                    orderBy: {
+                        game: {
+                            title: 'asc',
+                        },
+                    },
+                    include: {
+                        game: true,
                     },
                 },
             },
