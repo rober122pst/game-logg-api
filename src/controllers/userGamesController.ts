@@ -13,13 +13,7 @@ export const createUserGame = async (req: Request, res: Response, next: NextFunc
 
         if (userId !== req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
 
-        if (req.body.status !== 'PLAYING' && req.body.status !== 'DROPPED') {
-            if (!req.body.beatEvents || req.body.beatEvents.length === 0) {
-                return res.status(400).json({ message: 'Beat Events missing.' });
-            }
-        }
-
-        const userGame = await createUserGameService(userId, req.body, req.body.beatEvents[0]);
+        const userGame = await createUserGameService(userId, req.body);
         res.status(201).json(userGame);
     } catch (error) {
         next(error);

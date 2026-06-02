@@ -1,5 +1,5 @@
 import type { Prisma, UserGame } from '../../generated/prisma/client.ts';
-import type { BeatAction, DatePrecision, GameDifficulty, GameStatus } from '../../generated/prisma/enums.ts';
+import type { BeatAction, DatePrecision, GameDifficulty, GameStatus, Objective } from '../../generated/prisma/enums.ts';
 import type { BeatEventsCreateManyUserGameInput } from '../../generated/prisma/models.ts';
 import { prisma } from '../prisma.ts';
 
@@ -15,45 +15,48 @@ type AddGameEvent = {
 
 export type AddUserGame = {
     status: GameStatus;
-    comment?: string;
     favorite: boolean;
     difficulty: GameDifficulty;
-    acquiredAt?: Date;
+    objective: Objective;
     gameId: string;
+    initialPlaytime?: number;
+    price?: number;
     platformsIds: string[];
-    beatEvents: AddGameEvent[];
 };
 
-export async function createUserGameService(userId: string, ug: AddUserGame, eventsBody: AddGameEvent) {
+export async function createUserGameService(userId: string, ug: AddUserGame) {
     const platformId = ug.platformsIds[0];
     if (!platformId) {
         throw new Error('At least one platform ID is required');
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-        const userGame = await tx.userGame.create({
-            data: {
-                user: {
-                    connect: { id: userId },
-                },
-                game: {
-                    connect: { id: ug.gameId },
-                },
-                objective: 'PLATINUM',
-                difficulty: ug.difficulty,
-                status: ug.status,
-                comment: ug.comment ?? null,
-                favorite: ug.favorite,
-                acquiredAt: ug.acquiredAt ?? null,
+    const userGame = await prisma.userGame.create({
+        data: {
+            user: {
+                connect: { id: userId },
             },
-        });
-
-        const updatedUserGame = await addBeatEvent(userGame, eventsBody, platformId, tx);
-
-        return updatedUserGame;
+            game: {
+                connect: { id: ug.gameId },
+            },
+            playedPlatforms: {
+                connectOrCreate: {
+                    where: { userId_platformId: { userId, platformId } },
+                    create: {
+                        platformId,
+                        userId,
+                    },
+                },
+            },
+            objective: ug.objective,
+            difficulty: ug.difficulty ?? undefined,
+            status: ug.status,
+            initialPlaytime: ug.initialPlaytime ?? 0,
+            price: ug.price ?? null,
+            favorite: ug.favorite,
+        },
     });
 
-    return result;
+    return userGame;
 }
 
 export async function addBeatEvent(

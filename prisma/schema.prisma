@@ -160,6 +160,7 @@ model Profile {
 
 enum GameStatus {
   PLAYING
+  I_WILL_PLAY
   BEATED
   COMPLETED
   PLATINUM
@@ -246,7 +247,7 @@ model PlayedPlatform {
   userGameIds String[]   @db.ObjectId
   userGames   UserGame[] @relation(fields: [userGameIds], references: [id])
   userId      String     @db.ObjectId
-  user        User       @relation(fields: [userId], references: [id])
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   totalMinutes  Int @default(0)
   totalSessions Int @default(0)
@@ -274,15 +275,14 @@ model UserGame {
   status          GameStatus
   steam           SteamData?
 
+  initialPlaytime Int? @default(0) // minutos
+
   beatEvents BeatEvents[]
   objective  Objective
 
   rating     UserRating?
-  comment    String?
   favorite   Boolean         @default(false)
   difficulty GameDifficulty?
-
-  acquiredAt DateTime?
   price      Int?
 
   game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
