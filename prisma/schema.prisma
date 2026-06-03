@@ -190,8 +190,11 @@ model UserRating {
   graphics Int
   sound    Int
 
-  userGameId String   @unique @db.ObjectId
-  userGame   UserGame @relation(fields: [userGameId], references: [id])
+  userGameId String          @unique @db.ObjectId
+  userGame   UserGame        @relation(fields: [userGameId], references: [id])
+  comment    String?
+  Difficulty GameDifficulty?
+  favorite   Boolean
 
   createdAt DateTime @default(now())
   updateAt  DateTime @updatedAt
@@ -280,10 +283,8 @@ model UserGame {
   beatEvents BeatEvents[]
   objective  Objective
 
-  rating     UserRating?
-  favorite   Boolean         @default(false)
-  difficulty GameDifficulty?
-  price      Int?
+  rating UserRating?
+  price  Int?
 
   game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
   gameId String @db.ObjectId
