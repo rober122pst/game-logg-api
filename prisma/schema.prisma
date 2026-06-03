@@ -169,8 +169,8 @@ enum GameStatus {
 }
 
 enum Objective {
-  BEAT
-  COMPLETION
+  BEATED
+  COMPLETED
   PLATINUM
   PERFECT
 }
@@ -191,9 +191,9 @@ model UserRating {
   sound    Int
 
   userGameId String          @unique @db.ObjectId
-  userGame   UserGame        @relation(fields: [userGameId], references: [id])
+  userGame   UserGame        @relation(fields: [userGameId], references: [id], onDelete: Cascade)
   comment    String?
-  Difficulty GameDifficulty?
+  difficulty GameDifficulty?
   favorite   Boolean
 
   createdAt DateTime @default(now())

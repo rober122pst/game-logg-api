@@ -1,9 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
+import { addBeatEvent, createUserGameService, ratingGame } from '../services/userGamesServices.ts';
 
 import type { GameStatus } from '../../generated/prisma/enums.ts';
-import { prisma } from '../prisma.ts';
-import { createUserGameService } from '../services/userGamesServices.ts';
 import type { MyQuery } from '../types/index.js';
+import { prisma } from '../prisma.ts';
 
 export const createUserGame = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -15,6 +15,44 @@ export const createUserGame = async (req: Request, res: Response, next: NextFunc
 
         const userGame = await createUserGameService(userId, req.body);
         res.status(201).json(userGame);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const createBeatEvent = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.validatedId) return res.status(403).json({ message: 'Unauthorized' });
+        const userId = req.validatedId;
+
+        if (userId !== req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
+
+        const { userGameId, be } = req.body;
+        const userGame = await prisma.userGame.findFirst({
+            where: { id: userGameId },
+        });
+
+        if (!userGame) {
+            return res.status(404).json({ message: 'User game not found' });
+        }
+
+        const beatEvent = await addBeatEvent(userGame, be);
+        res.status(201).json(beatEvent);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const createRating = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.validatedId) return res.status(403).json({ message: 'Unauthorized' });
+        const userId = req.validatedId;
+
+        if (userId !== req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
+
+        const ratingBody = req.body;
+        const rating = await ratingGame(ratingBody);
+        res.status(201).json(rating);
     } catch (error) {
         next(error);
     }

@@ -1,12 +1,12 @@
-import type { Prisma, UserGame } from '../../generated/prisma/client.ts';
 import type { BeatAction, DatePrecision, GameDifficulty, GameStatus, Objective } from '../../generated/prisma/enums.ts';
-import type { BeatEventsCreateManyUserGameInput } from '../../generated/prisma/models.ts';
+import type { Prisma, UserGame } from '../../generated/prisma/client.ts';
+
 import { prisma } from '../prisma.ts';
 
 type AddGameEvent = {
     action: BeatAction;
     platformId: string;
-
+    initialPlaytime: number | null;
     dateInput: string;
     hourInput: string | null;
     precision: DatePrecision;
@@ -21,15 +21,9 @@ export type AddUserGame = {
     gameId: string;
     initialPlaytime?: number;
     price?: number;
-    platformsIds: string[];
 };
 
 export async function createUserGameService(userId: string, ug: AddUserGame) {
-    const platformId = ug.platformsIds[0];
-    if (!platformId) {
-        throw new Error('At least one platform ID is required');
-    }
-
     const userGame = await prisma.userGame.create({
         data: {
             user: {
@@ -37,15 +31,6 @@ export async function createUserGameService(userId: string, ug: AddUserGame) {
             },
             game: {
                 connect: { id: ug.gameId },
-            },
-            playedPlatforms: {
-                connectOrCreate: {
-                    where: { userId_platformId: { userId, platformId } },
-                    create: {
-                        platformId,
-                        userId,
-                    },
-                },
             },
             objective: ug.objective,
             difficulty: ug.difficulty ?? undefined,
@@ -59,18 +44,13 @@ export async function createUserGameService(userId: string, ug: AddUserGame) {
     return userGame;
 }
 
-export async function addBeatEvent(
-    ug: UserGame,
-    eventsBody: AddGameEvent,
-    platformId: string,
-    tx: Prisma.TransactionClient = prisma
-) {
+export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: Prisma.TransactionClient = prisma) {
     const currentBeatEvents = await tx.beatEvents.findMany({
         where: { userGameId: ug.id },
     });
 
     const playedPlatform = await tx.playedPlatform.upsert({
-        where: { userId_platformId: { userId: ug.userId, platformId } },
+        where: { userId_platformId: { userId: ug.userId, platformId: eventsBody.platformId } },
         update: {
             totalMinutes: {
                 increment: eventsBody.timeToEvent ? eventsBody.timeToEvent * 60 : 0,
@@ -78,12 +58,12 @@ export async function addBeatEvent(
         },
         create: {
             user: { connect: { id: ug.userId } },
-            platform: { connect: { id: platformId } },
+            platform: { connect: { id: eventsBody.platformId } },
             totalMinutes: eventsBody.timeToEvent ? eventsBody.timeToEvent * 60 : 0,
         },
     });
 
-    const beatEvents: BeatEventsCreateManyUserGameInput[] = [];
+    const beatEvents: Prisma.BeatEventsCreateManyInput | Prisma.BeatEventsCreateManyInput[] = [];
     if (ug.status !== 'PLAYING' && ug.status !== 'DROPPED') {
         const { occurrenceAtStart, occurrenceAtEnd } = getOccurrenceRange(
             eventsBody.dateInput,
@@ -98,6 +78,7 @@ export async function addBeatEvent(
             precision: eventsBody.precision,
             timeToEvent: eventsBody.timeToEvent ? eventsBody.timeToEvent * 60 : 0,
             platformId: playedPlatform.id,
+            userGameId: ug.id,
         });
 
         if (currentBeatEvents.length < 1) {
@@ -109,6 +90,7 @@ export async function addBeatEvent(
                     precision: eventsBody.precision,
                     timeToEvent: 0,
                     platformId: playedPlatform.id,
+                    userGameId: ug.id,
                 });
 
                 if (ug.status === 'PERFECT') {
@@ -119,6 +101,7 @@ export async function addBeatEvent(
                         precision: eventsBody.precision,
                         timeToEvent: 0,
                         platformId: playedPlatform.id,
+                        userGameId: ug.id,
                     });
                 }
             }
@@ -134,35 +117,65 @@ export async function addBeatEvent(
 
     let newStatus: GameStatus = 'BEATED';
 
-    if (ug.status === 'PLAYING' || ug.status === 'DROPPED') {
+    if (ug.status === 'PLAYING' || ug.status === 'DROPPED' || ug.status === 'I_WILL_PLAY') {
         newStatus = ug.status;
     } else if (actions[eventsBody.action] > actions[ug.status]) {
         newStatus = eventsBody.action;
         console.log(newStatus);
     }
 
-    const userGame = await tx.userGame.update({
+    await tx.userGame.update({
         where: {
             userId_gameId: { userId: ug.userId, gameId: ug.gameId },
         },
         data: {
             status: newStatus,
-            playedPlatforms: { connect: { id: playedPlatform.id } },
-            beatEvents: {
-                createMany: {
-                    data: beatEvents,
-                },
+            playedPlatforms: {
+                connect: { id: playedPlatform.id },
             },
-        },
-        include: {
-            playedPlatforms: true,
-            beatEvents: true,
         },
     });
 
-    return userGame;
+    const events = await tx.beatEvents.createMany({
+        data: beatEvents,
+    });
+
+    return events;
 }
 
+interface RatingBody {
+    userGameId: string;
+    difficulty: GameDifficulty;
+    scores: {
+        gameplay: number;
+        graphics: number;
+        story: number;
+        sound: number;
+    };
+    comment: string;
+    favorite: boolean;
+}
+
+export async function ratingGame({ userGameId, difficulty, scores, comment, favorite }: RatingBody) {
+    const rating = await prisma.userRating.create({
+        data: {
+            gameplay: scores.gameplay,
+            graphics: scores.graphics,
+            sound: scores.sound,
+            story: scores.story,
+            comment,
+            favorite,
+            difficulty,
+            userGame: {
+                connect: {
+                    id: userGameId,
+                },
+            },
+        },
+    });
+
+    return rating;
+}
 export interface OccurrenceRange {
     occurrenceAtStart: Date;
     occurrenceAtEnd: Date;
