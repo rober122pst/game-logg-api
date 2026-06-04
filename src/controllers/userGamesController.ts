@@ -2,16 +2,24 @@ import type { NextFunction, Request, Response } from 'express';
 import { addBeatEvent, createUserGameService, ratingGame } from '../services/userGamesServices.ts';
 
 import type { GameStatus } from '../../generated/prisma/enums.ts';
-import type { MyQuery } from '../types/index.js';
 import { prisma } from '../prisma.ts';
+import type { MyQuery } from '../types/index.js';
 
 export const createUserGame = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.validatedId) return res.status(403).json({ message: 'Unauthorized' });
+        if (!req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
+        const ug = await prisma.userGame.findUnique({
+            where: {
+                userId_gameId: {
+                    userId: req.user.id,
+                    gameId: (req.body as { gameId: string }).gameId,
+                },
+            },
+        });
 
-        const userId = req.validatedId;
+        if (ug) return res.status(409).json({ message: 'This game is already registered for this user.' });
 
-        if (userId !== req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
+        const userId = req.user.id;
 
         const userGame = await createUserGameService(userId, req.body);
         res.status(201).json(userGame);
@@ -22,15 +30,13 @@ export const createUserGame = async (req: Request, res: Response, next: NextFunc
 
 export const createBeatEvent = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.validatedId) return res.status(403).json({ message: 'Unauthorized' });
-        const userId = req.validatedId;
-
-        if (userId !== req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
-
-        const { userGameId, be } = req.body;
-        const userGame = await prisma.userGame.findFirst({
-            where: { id: userGameId },
+        if (!req.validatedId) return res.status(400).json({ message: 'Invalid ID' });
+        const be = req.body;
+        const userGame = await prisma.userGame.findUnique({
+            where: { id: req.validatedId },
         });
+
+        if (!req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
 
         if (!userGame) {
             return res.status(404).json({ message: 'User game not found' });
@@ -45,13 +51,18 @@ export const createBeatEvent = async (req: Request, res: Response, next: NextFun
 
 export const createRating = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.validatedId) return res.status(403).json({ message: 'Unauthorized' });
-        const userId = req.validatedId;
+        if (!req.validatedId) return res.status(400).json({ message: 'Invalid ID' });
 
-        if (userId !== req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
+        const exists = await prisma.userRating.findUnique({
+            where: { userGameId: req.validatedId },
+        });
+        if (exists)
+            return res.status(409).json({ message: 'Hey, it looks like this user has already rated this game...' });
+
+        if (!req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
 
         const ratingBody = req.body;
-        const rating = await ratingGame(ratingBody);
+        const rating = await ratingGame({ ...ratingBody, userGameId: req.validatedId });
         res.status(201).json(rating);
     } catch (error) {
         next(error);

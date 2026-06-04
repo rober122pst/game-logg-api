@@ -1,5 +1,5 @@
-import type { BeatAction, DatePrecision, GameDifficulty, GameStatus, Objective } from '../../generated/prisma/enums.ts';
 import type { Prisma, UserGame } from '../../generated/prisma/client.ts';
+import type { BeatAction, DatePrecision, GameDifficulty, GameStatus, Objective } from '../../generated/prisma/enums.ts';
 
 import { prisma } from '../prisma.ts';
 
@@ -45,7 +45,7 @@ export async function createUserGameService(userId: string, ug: AddUserGame) {
 }
 
 export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: Prisma.TransactionClient = prisma) {
-    const currentBeatEvents = await tx.beatEvents.findMany({
+    const currentBeatEvents = await tx.beatEvents.count({
         where: { userGameId: ug.id },
     });
 
@@ -81,8 +81,12 @@ export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: P
             userGameId: ug.id,
         });
 
-        if (currentBeatEvents.length < 1) {
-            if (ug.status === 'COMPLETED' || ug.status === 'PLATINUM' || ug.status === 'PERFECT') {
+        if (currentBeatEvents < 1) {
+            if (
+                eventsBody.action === 'COMPLETED' ||
+                eventsBody.action === 'PLATINUM' ||
+                eventsBody.action === 'PERFECT'
+            ) {
                 beatEvents.push({
                     action: 'BEATED',
                     occurredAtStart: occurrenceAtStart,
@@ -93,7 +97,7 @@ export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: P
                     userGameId: ug.id,
                 });
 
-                if (ug.status === 'PERFECT') {
+                if (eventsBody.action === 'PERFECT') {
                     beatEvents.push({
                         action: 'PLATINUM',
                         occurredAtStart: occurrenceAtStart,
@@ -152,7 +156,7 @@ interface RatingBody {
         story: number;
         sound: number;
     };
-    comment: string;
+    comment?: string;
     favorite: boolean;
 }
 
@@ -163,7 +167,7 @@ export async function ratingGame({ userGameId, difficulty, scores, comment, favo
             graphics: scores.graphics,
             sound: scores.sound,
             story: scores.story,
-            comment,
+            comment: comment ?? null,
             favorite,
             difficulty,
             userGame: {
@@ -229,27 +233,27 @@ export function getOccurrenceRange(
     switch (precision) {
         case 'YEAR':
             // Do primeiro segundo de 1º de Janeiro até o último segundo de 31 de Dezembro
-            occurrenceAtStart = new Date(year, 0, 1, 0, 0, 0, 0);
-            occurrenceAtEnd = new Date(year, 11, 31, 23, 59, 59, 999);
+            occurrenceAtStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+            occurrenceAtEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
             break;
 
         case 'MONTH':
             // Passar '0' no dia do próximo mês retorna o último dia do mês atual
-            occurrenceAtStart = new Date(year, month, 1, 0, 0, 0, 0);
-            occurrenceAtEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+            occurrenceAtStart = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+            occurrenceAtEnd = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
             break;
 
         case 'DAY':
             // Do primeiro ao último segundo do dia específico
-            occurrenceAtStart = new Date(year, month, day, 0, 0, 0, 0);
-            occurrenceAtEnd = new Date(year, month, day, 23, 59, 59, 999);
+            occurrenceAtStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+            occurrenceAtEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
             break;
 
         case 'HOUR':
         default:
             // Presume-se que engloba o minuto exato recebido na hora
-            occurrenceAtStart = new Date(year, month, day, hours, minutes, 0, 0);
-            occurrenceAtEnd = new Date(year, month, day, hours, minutes, 59, 999);
+            occurrenceAtStart = new Date(Date.UTC(year, month, day, hours, minutes, 0, 0));
+            occurrenceAtEnd = new Date(Date.UTC(year, month, day, hours, minutes, 59, 999));
             break;
     }
 

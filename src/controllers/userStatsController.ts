@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { prisma } from '../prisma.ts';
 
-// // pegar estatísticas completas para exibir no profile
+// pegar estatísticas completas para exibir no profile
 export const getProfileStats = async (req: Request, res: Response, next: NextFunction) => {
     try {
         if (!req.validatedId) return res.status(400).json({ message: 'User ID is required' });
