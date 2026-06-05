@@ -1,27 +1,13 @@
+import { z } from 'zod';
 import type { Prisma, UserGame } from '../../generated/prisma/client.ts';
-import type { BeatAction, DatePrecision, GameDifficulty, GameStatus, Objective } from '../../generated/prisma/enums.ts';
+import type { DatePrecision, GameStatus } from '../../generated/prisma/enums.ts';
 
 import { prisma } from '../prisma.ts';
+import type { createBeatEventSchema, createRatingSchema, createUserGameSchema } from './userGamesValidation.ts';
 
-type AddGameEvent = {
-    action: BeatAction;
-    platformId: string;
-    initialPlaytime: number | null;
-    dateInput: string;
-    hourInput: string | null;
-    precision: DatePrecision;
-    timeToEvent?: number | null;
-};
+type AddGameEvent = z.infer<typeof createBeatEventSchema>;
 
-export type AddUserGame = {
-    status: GameStatus;
-    favorite: boolean;
-    difficulty: GameDifficulty;
-    objective: Objective;
-    gameId: string;
-    initialPlaytime?: number;
-    price?: number;
-};
+export type AddUserGame = z.infer<typeof createUserGameSchema>;
 
 export async function createUserGameService(userId: string, ug: AddUserGame) {
     const userGame = await prisma.userGame.create({
@@ -33,11 +19,9 @@ export async function createUserGameService(userId: string, ug: AddUserGame) {
                 connect: { id: ug.gameId },
             },
             objective: ug.objective,
-            difficulty: ug.difficulty ?? undefined,
             status: ug.status,
             initialPlaytime: ug.initialPlaytime ?? 0,
             price: ug.price ?? null,
-            favorite: ug.favorite,
         },
     });
 
@@ -82,11 +66,7 @@ export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: P
         });
 
         if (currentBeatEvents < 1) {
-            if (
-                eventsBody.action === 'COMPLETED' ||
-                eventsBody.action === 'PLATINUM' ||
-                eventsBody.action === 'PERFECT'
-            ) {
+            if (ug.status === 'COMPLETED' || ug.status === 'PLATINUM' || ug.status === 'PERFECT') {
                 beatEvents.push({
                     action: 'BEATED',
                     occurredAtStart: occurrenceAtStart,
@@ -97,7 +77,7 @@ export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: P
                     userGameId: ug.id,
                 });
 
-                if (eventsBody.action === 'PERFECT') {
+                if (ug.status === 'PERFECT') {
                     beatEvents.push({
                         action: 'PLATINUM',
                         occurredAtStart: occurrenceAtStart,
@@ -123,9 +103,8 @@ export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: P
 
     if (ug.status === 'PLAYING' || ug.status === 'DROPPED' || ug.status === 'I_WILL_PLAY') {
         newStatus = ug.status;
-    } else if (actions[eventsBody.action] > actions[ug.status]) {
+    } else if (actions[eventsBody.action] > actions[ug.status as keyof typeof actions]) {
         newStatus = eventsBody.action;
-        console.log(newStatus);
     }
 
     await tx.userGame.update({
@@ -147,17 +126,9 @@ export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: P
     return events;
 }
 
-interface RatingBody {
+type RatingInput = z.infer<typeof createRatingSchema>;
+interface RatingBody extends RatingInput {
     userGameId: string;
-    difficulty: GameDifficulty;
-    scores: {
-        gameplay: number;
-        graphics: number;
-        story: number;
-        sound: number;
-    };
-    comment?: string;
-    favorite: boolean;
 }
 
 export async function ratingGame({ userGameId, difficulty, scores, comment, favorite }: RatingBody) {
@@ -180,6 +151,7 @@ export async function ratingGame({ userGameId, difficulty, scores, comment, favo
 
     return rating;
 }
+
 export interface OccurrenceRange {
     occurrenceAtStart: Date;
     occurrenceAtEnd: Date;
@@ -187,7 +159,7 @@ export interface OccurrenceRange {
 
 /**
  * Retorna o início e o fim de um período baseado em uma data e precisão.
- * * @param dateString - Data no formato 'aaaa', 'mm/aaaa' ou 'dd/mm/aaaa'
+ * @param dateString - Data no formato 'aaaa', 'mm/aaaa' ou 'dd/mm/aaaa'
  * @param timeString - Hora no formato 'HH:mm' (Opcional, default '00:00')
  * @param precision - Nível de precisão desejado ('Hora', 'Dia', 'Mes', 'Ano')
  */
@@ -233,27 +205,27 @@ export function getOccurrenceRange(
     switch (precision) {
         case 'YEAR':
             // Do primeiro segundo de 1º de Janeiro até o último segundo de 31 de Dezembro
-            occurrenceAtStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
-            occurrenceAtEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+            occurrenceAtStart = new Date(year, 0, 1, 0, 0, 0, 0);
+            occurrenceAtEnd = new Date(year, 11, 31, 23, 59, 59, 999);
             break;
 
         case 'MONTH':
             // Passar '0' no dia do próximo mês retorna o último dia do mês atual
-            occurrenceAtStart = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
-            occurrenceAtEnd = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+            occurrenceAtStart = new Date(year, month, 1, 0, 0, 0, 0);
+            occurrenceAtEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
             break;
 
         case 'DAY':
             // Do primeiro ao último segundo do dia específico
-            occurrenceAtStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
-            occurrenceAtEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+            occurrenceAtStart = new Date(year, month, day, 0, 0, 0, 0);
+            occurrenceAtEnd = new Date(year, month, day, 23, 59, 59, 999);
             break;
 
         case 'HOUR':
         default:
             // Presume-se que engloba o minuto exato recebido na hora
-            occurrenceAtStart = new Date(Date.UTC(year, month, day, hours, minutes, 0, 0));
-            occurrenceAtEnd = new Date(Date.UTC(year, month, day, hours, minutes, 59, 999));
+            occurrenceAtStart = new Date(year, month, day, hours, minutes, 0, 0);
+            occurrenceAtEnd = new Date(year, month, day, hours, minutes, 59, 999);
             break;
     }
 

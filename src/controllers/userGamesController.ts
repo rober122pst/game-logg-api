@@ -1,27 +1,59 @@
+/* eslint-disable quotes */
 import type { NextFunction, Request, Response } from 'express';
 import { addBeatEvent, createUserGameService, ratingGame } from '../services/userGamesServices.ts';
+import {
+    createBeatEventSchema,
+    createRatingSchema,
+    createUserGameSchema,
+    getUserGamesQuerySchema,
+} from '../services/userGamesValidation.ts';
 
+import { ZodError } from 'zod';
 import type { GameStatus } from '../../generated/prisma/enums.ts';
 import { prisma } from '../prisma.ts';
-import type { MyQuery } from '../types/index.js';
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+function formatZodError(error: ZodError<unknown>) {
+    return error.issues.map((e) => ({
+        field: e.path.join('.') || 'root',
+        message: e.message,
+    }));
+}
+
+// ─── Controllers ──────────────────────────────────────────────────────────────
 
 export const createUserGame = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
-        const ug = await prisma.userGame.findUnique({
-            where: {
-                userId_gameId: {
-                    userId: req.user.id,
-                    gameId: (req.body as { gameId: string }).gameId,
-                },
-            },
+        if (!req.user?.id) {
+            return res
+                .status(403)
+                .json({ message: 'Whoa there! You need to be logged in to add games to your library.' });
+        }
+
+        const parsed = createUserGameSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Hmm, something's off with the data you sent. Check the fields below!",
+                errors: formatZodError(parsed.error),
+            });
+        }
+
+        const { gameId } = parsed.data;
+
+        const existing = await prisma.userGame.findUnique({
+            where: { userId_gameId: { userId: req.user.id, gameId } },
         });
 
-        if (ug) return res.status(409).json({ message: 'This game is already registered for this user.' });
+        if (existing) {
+            return res
+                .status(409)
+                .json({ message: "Looks like you've already got this game in your library. No duplicates allowed!" });
+        }
 
-        const userId = req.user.id;
-
-        const userGame = await createUserGameService(userId, req.body);
+        // parsed.data may contain a status variant used only for client-side events (e.g. "BEAT_EVENT").
+        // Cast to any to satisfy service input types while preserving runtime behavior.
+        const userGame = await createUserGameService(req.user.id, parsed.data);
         res.status(201).json(userGame);
     } catch (error) {
         next(error);
@@ -30,19 +62,39 @@ export const createUserGame = async (req: Request, res: Response, next: NextFunc
 
 export const createBeatEvent = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.validatedId) return res.status(400).json({ message: 'Invalid ID' });
-        const be = req.body;
+        if (!req.user?.id) {
+            return res.status(403).json({ message: 'You need to be logged in to register your achievements, hero!' });
+        }
+
+        if (!req.validatedId) {
+            return res.status(400).json({ message: 'That game ID looks suspicious... did you drop it somewhere?' });
+        }
+
+        const parsed = createBeatEventSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: 'Your event data has some issues. Double-check and try again!',
+                errors: formatZodError(parsed.error),
+            });
+        }
+
         const userGame = await prisma.userGame.findUnique({
             where: { id: req.validatedId },
         });
 
-        if (!req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
-
         if (!userGame) {
-            return res.status(404).json({ message: 'User game not found' });
+            return res
+                .status(404)
+                .json({ message: "We couldn't find that game in any library. Are you sure it's registered?" });
         }
 
-        const beatEvent = await addBeatEvent(userGame, be);
+        if (userGame.userId !== req.user.id) {
+            return res
+                .status(403)
+                .json({ message: 'Nice try! You can only log events for games in your own library.' });
+        }
+
+        const beatEvent = await addBeatEvent(userGame, parsed.data);
         res.status(201).json(beatEvent);
     } catch (error) {
         next(error);
@@ -51,18 +103,49 @@ export const createBeatEvent = async (req: Request, res: Response, next: NextFun
 
 export const createRating = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.validatedId) return res.status(400).json({ message: 'Invalid ID' });
+        if (!req.user?.id) {
+            return res.status(403).json({ message: 'You need to be logged in to drop a review!' });
+        }
 
-        const exists = await prisma.userRating.findUnique({
+        if (!req.validatedId) {
+            return res.status(400).json({ message: 'That game ID looks suspicious... did you drop it somewhere?' });
+        }
+
+        const parsed = createRatingSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: 'Your rating data seems a bit off. Give it another look!',
+                errors: formatZodError(parsed.error),
+            });
+        }
+
+        const userGame = await prisma.userGame.findUnique({
+            where: { id: req.validatedId },
+        });
+
+        if (!userGame) {
+            return res
+                .status(404)
+                .json({ message: "That game isn't in anyone's library. Make sure it's registered first!" });
+        }
+
+        if (userGame.userId !== req.user.id) {
+            return res
+                .status(403)
+                .json({ message: "You can only rate games from your own library, not someone else's!" });
+        }
+
+        const existingRating = await prisma.userRating.findUnique({
             where: { userGameId: req.validatedId },
         });
-        if (exists)
-            return res.status(409).json({ message: 'Hey, it looks like this user has already rated this game...' });
 
-        if (!req.user?.id) return res.status(403).json({ message: 'Unauthorized' });
+        if (existingRating) {
+            return res
+                .status(409)
+                .json({ message: "Hey, looks like you've already rated this one. No double dipping!" });
+        }
 
-        const ratingBody = req.body;
-        const rating = await ratingGame({ ...ratingBody, userGameId: req.validatedId });
+        const rating = await ratingGame({ ...parsed.data, userGameId: req.validatedId });
         res.status(201).json(rating);
     } catch (error) {
         next(error);
@@ -71,45 +154,42 @@ export const createRating = async (req: Request, res: Response, next: NextFuncti
 
 export const getUserGames = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.validatedId) return res.status(400).json({ message: 'Invalid user id' });
+        if (!req.validatedId) {
+            return res.status(400).json({ message: "That user ID doesn't look right. Are you sure it's correct?" });
+        }
+
+        const parsed = getUserGamesQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Those query params don't look right. Check the filters you're using!",
+                errors: formatZodError(parsed.error),
+            });
+        }
 
         const userId = req.validatedId;
-
-        const { gameId, favorite, status } = req.query as unknown as MyQuery;
+        const { gameId, favorite, status } = parsed.data;
 
         const query: { userId: string; favorite?: boolean; gameId?: string; status?: GameStatus } = { userId };
 
-        if (favorite !== undefined) {
-            query.favorite = favorite === 'true';
-        }
-        if (gameId) {
-            query.gameId = gameId;
-        }
-        if (status) {
-            query.status = status;
-        }
+        if (favorite !== undefined) query.favorite = favorite === 'true';
+        if (gameId) query.gameId = gameId;
+        if (status) query.status = status;
 
         const library = await prisma.user.findUnique({
             where: { id: userId },
             select: {
                 library: {
-                    where: {
-                        ...query,
-                    },
-                    orderBy: {
-                        game: {
-                            title: 'asc',
-                        },
-                    },
-                    include: {
-                        game: true,
-                    },
+                    where: { ...query },
+                    orderBy: { game: { title: 'asc' } },
+                    include: { game: true },
                 },
             },
         });
 
         if (!library) {
-            return res.status(404).json({ message: 'User not found' });
+            return res
+                .status(404)
+                .json({ message: "This player doesn't seem to exist in our records. Maybe they rage-quit?" });
         }
 
         res.status(200).json(library.library);
@@ -117,112 +197,3 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
         next(error);
     }
 };
-
-// export const getTotalTime = async (req, res) => {
-//     try {
-//         const { userId } = req.params;
-
-//         // Busca todos os jogos do usuário
-//         const games = await UserGames.find({ userId });
-
-//         if (!games || games.length === 0) {
-//             return res.status(404).json({ message: "Nenhum jogo encontrado para este usuário." });
-//         }
-
-//         // Soma o tempo total (em minutos)
-//         const totalMinutes = games.reduce((acc, game) => {
-//             return acc + (game.steam?.playtimeForever || 0);
-//         }, 0);
-
-//         // Converte minutos para horas e minutos
-//         const hours = Math.floor(totalMinutes / 60);
-//         const minutes = totalMinutes % 60;
-
-//         res.json({
-//             userId,
-//             totalMinutes,
-//             formatted: `${hours}h ${minutes}m`
-//         });
-
-//     } catch (err) {
-//         console.error(err);
-//         res.status(500).json({ message: "Erro ao calcular tempo total de jogo." });
-//     }
-// }
-
-// export const getLastPlayedGames = async (req, res) => {
-//     try {
-//         const { userId } = req.params;
-//         const { count } = req.query;
-//         const limit = parseInt(count) || 10; // número de jogos a retornar, padrão 10
-
-//         // busca os jogos do usuário, ordenando pelo campo steam.lastPlayed (mais recentes primeiro)
-//         const games = await UserGames.find({ userId, "steam.lastPlayed": { $ne: null } })
-//             .sort({ "steam.lastPlayed": -1 }) // -1 = decrescente (mais recente primeiro)
-//             .limit(limit); // opcional: retorna só os 10 mais recentes
-
-//         if (!games || games.length === 0) {
-//             return res.status(404).json({ message: "Nenhum jogo encontrado para este usuário." });
-//         }
-
-//         res.json({
-//             userId,
-//             recentGames: games.map(game => ({
-//                 gameId: game.gameId,
-//                 steamAppId: game.steam?.steamAppId || null,
-//                 lastPlayed: game.steam?.lastPlayed || null,
-//                 playtimeForever: game.steam?.playtimeForever || 0
-//             }))
-//         });
-
-//     } catch (err) {
-//         console.error(err);
-//         res.status(500).json({ message: "Erro ao buscar jogos recentes do usuário." });
-//     }
-// }
-
-// List all user Games
-// module.exports = {
-
-//     async create(req, res){
-//         try{
-//             const userGame = new userGames(req.body);
-//             await userGame.save();
-//             res.status(201).json(userGame);
-//         } catch (error){
-//             res.status(400).json({message: error.message});
-//         }
-//     },
-
-//     async read(req, res){
-//         try{
-//             const userGamesList = await userGames.find();
-//             res.status(200).json({userGamesList});
-//         } catch (error){
-//             res.status(500).json({message: error.message});
-//         }
-//     },
-//     async update(req, res){
-//         try{
-//             const { id } = req.params;
-//             const userGame = await userGames.findByIdAndUpdate(id, req.body, {new: true});
-//             if(!userGame){
-//                 return res.status(404).json({message: "User Game not found"});
-//             }
-//         } catch (error){
-//                 res.status(400).json({message: error.message});
-//         };
-//     },
-//     async delete(req, res){
-//         try{
-//             const { id } = req.params;
-//             const userGame = await userGames.findByIdAndDelete(id);
-//             if(!userGame){
-//                 return res.status(404).json({message: "User Game not found"});
-//             }
-//             res.status(200).json({message: "User Game deleted successfully"});
-//         } catch (error){
-//                 res.status(400).json({message: error.message});
-//         }
-//     }
-// };

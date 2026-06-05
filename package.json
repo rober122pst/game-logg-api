@@ -20,7 +20,8 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-steam": "^1.0.18",
-    "prisma": "6.19"
+    "prisma": "6.19",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
