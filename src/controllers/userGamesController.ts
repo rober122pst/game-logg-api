@@ -1,4 +1,3 @@
-/* eslint-disable quotes */
 import type { NextFunction, Request, Response } from 'express';
 import { addBeatEvent, createUserGameService, ratingGame } from '../services/userGamesServices.ts';
 import {
@@ -154,7 +153,7 @@ export const createRating = async (req: Request, res: Response, next: NextFuncti
 
 export const getUserGames = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.validatedId) {
+        if (!req.user?.id) {
             return res.status(400).json({ message: "That user ID doesn't look right. Are you sure it's correct?" });
         }
 
@@ -166,7 +165,7 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
             });
         }
 
-        const userId = req.validatedId;
+        const userId = req.user.id;
         const { gameId, favorite, status } = parsed.data;
 
         const query: { userId: string; favorite?: boolean; gameId?: string; status?: GameStatus } = { userId };
@@ -181,7 +180,7 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
                 library: {
                     where: { ...query },
                     orderBy: { game: { title: 'asc' } },
-                    include: { game: true },
+                    include: { game: true, rating: true, beatEvents: true },
                 },
             },
         });

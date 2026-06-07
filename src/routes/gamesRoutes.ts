@@ -5,6 +5,7 @@ import { validateId } from '../middlewares/validateId.ts';
 const routes = express.Router();
 
 routes.get('/', gamesController.getGames);
+routes.get('/popular-games', gamesController.getPopularGames);
 routes.get('/suggestions', gamesController.getGameSuggestions);
 routes.get('/:id', validateId('id'), gamesController.createGame);
 

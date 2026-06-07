@@ -8,6 +8,12 @@ if (!clientId || !token) {
     console.error('IGDB API credentials are not set in environment variables');
 }
 
+export interface PopScorePrimitive {
+    id: number;
+    value: number;
+    game_id: number;
+}
+
 export const requestOptions: ApicalypseConfig = {
     queryMethod: 'body',
     method: 'POST',

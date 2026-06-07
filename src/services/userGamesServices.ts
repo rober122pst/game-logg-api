@@ -20,7 +20,7 @@ export async function createUserGameService(userId: string, ug: AddUserGame) {
             },
             objective: ug.objective,
             status: ug.status,
-            initialPlaytime: ug.initialPlaytime ?? 0,
+            initialPlaytime: ug.initialPlaytime ? ug.initialPlaytime * 60 : 0,
             price: ug.price ?? null,
         },
     });

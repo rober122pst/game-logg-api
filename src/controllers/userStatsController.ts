@@ -30,7 +30,7 @@ export const getProfileStats = async (req: Request, res: Response, next: NextFun
             },
         });
 
-        const totalPlaytime = calcTotalTime(userId);
+        const totalPlaytime = await calcTotalTime(userId);
 
         res.json({ beatedGames, platinumGames, totalPlaytime });
     } catch (error) {
@@ -40,51 +40,33 @@ export const getProfileStats = async (req: Request, res: Response, next: NextFun
 
 export const getMostPlayedPlatforms = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // const top3Platforms = await prisma.beatEvents.aggregateRaw({
-        //     pipeline: [
-        //         { $group: { _id: '$platformId', totalTime: { $sum: '$timeToBeat' } } },
-        //         { $sort: { totalTime: -1 } },
-        //         { $limit: 3 },
-        //         { $lookup: { from: 'PlayedPlatform', localField: '_id', foreingField: '_id', as: 'playedPlatform' } },
-        //         { $unwind: '$playedPlatform' },
-        //         { $playedPlatform: }
-        //     ],
-        // });
         if (!req.user?.id) return res.status(400).json({ message: 'User ID is required' });
         const userId = req.user.id;
 
-        const topPlatforms = await prisma.playedPlatform.groupBy({
-            by: ['platformId'],
-            where: {
-                userId,
+        const totalTimeAgg = await prisma.playedPlatform.aggregate({
+            where: { userId },
+            _sum: {
+                totalMinutes: true,
             },
-            _count: {
-                platformId: true,
-            },
+        });
+
+        const allTotalMinutes = totalTimeAgg._sum.totalMinutes || 0;
+
+        const topPlatforms = await prisma.playedPlatform.findMany({
+            where: { userId },
             orderBy: {
-                _count: {
-                    platformId: 'desc',
-                },
+                totalMinutes: 'desc',
+            },
+            take: 3,
+            include: {
+                platform: true,
             },
         });
 
-        const platforms = await prisma.platform.findMany({
-            where: {
-                id: {
-                    in: topPlatforms.slice(0, 3).map((p) => p.platformId),
-                },
-            },
-        });
-
-        const top = topPlatforms.slice(0, 3).map((tp) => ({
-            ...tp,
-            platform: platforms.find((p) => p.id === tp.platformId),
-        }));
-
-        const result = top.map((t) => ({
-            name: t.platform?.name,
-            score: t._count.platformId,
-            percent: t._count.platformId / topPlatforms.length,
+        const result = topPlatforms.map((tp) => ({
+            name: tp.platform?.name,
+            score: tp.totalMinutes,
+            percent: allTotalMinutes > 0 ? tp.totalMinutes / allTotalMinutes : 0,
         }));
 
         res.status(200).json(result);

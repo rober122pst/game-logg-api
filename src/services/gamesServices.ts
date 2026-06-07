@@ -14,6 +14,7 @@ export type IGDBGame = {
     screenshots: { image_id: number }[];
     storyline: string;
     rating: number;
+    pop_score_value?: number;
 };
 
 export async function createGameWithIGDB(igdbId: number) {

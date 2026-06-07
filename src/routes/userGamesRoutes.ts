@@ -2,7 +2,6 @@ import * as userGamesController from '../controllers/userGamesController.ts';
 
 import express from 'express';
 import { authenticateToken } from '../auth/authMiddleware.ts';
-import { privateProfile } from '../middlewares/privateProfile.ts';
 import { validateId } from '../middlewares/validateId.ts';
 
 const routes = express.Router();
@@ -10,7 +9,7 @@ const routes = express.Router();
 routes.use(authenticateToken);
 
 routes.post('/', userGamesController.createUserGame);
-routes.get('/', privateProfile, userGamesController.getUserGames);
+routes.get('/', userGamesController.getUserGames);
 routes.post('/:id/events', validateId('id'), userGamesController.createBeatEvent);
 routes.post('/:id/rating', validateId('id'), userGamesController.createRating);
 // routes.get('/:userId/games/lastplayed', userGamesController.getLastPlayedGames);
