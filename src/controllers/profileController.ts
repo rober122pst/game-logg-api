@@ -12,14 +12,14 @@ export const getProfileData = async (req: Request, res: Response, next: NextFunc
 
         const topGenres = await getGenreStats(userId);
         const favoriteGames = await prisma.userGame.findMany({
-            where: { rating: { favorite: true } },
+            where: { rating: { favorite: true }, userId: userId },
             include: {
                 game: { select: { id: true, igdbId: true, coverUrl: true, title: true, slug: true } },
                 rating: true,
             },
         });
         const playingNow = await prisma.userGame.findMany({
-            where: { status: 'PLAYING' },
+            where: { status: 'PLAYING', userId },
             select: {
                 game: {
                     select: { title: true },

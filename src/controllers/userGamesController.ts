@@ -166,13 +166,16 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
         }
 
         const userId = req.user.id;
-        const { gameId, favorite, status } = parsed.data;
+        const { id, gameId, favorite, status } = parsed.data;
 
-        const query: { userId: string; favorite?: boolean; gameId?: string; status?: GameStatus } = { userId };
+        const query: { userId: string; id?: string; favorite?: boolean; gameId?: string; status?: GameStatus } = {
+            userId,
+        };
 
         if (favorite !== undefined) query.favorite = favorite === 'true';
         if (gameId) query.gameId = gameId;
         if (status) query.status = status;
+        if (id) query.id = id;
 
         const library = await prisma.user.findUnique({
             where: { id: userId },
@@ -180,7 +183,14 @@ export const getUserGames = async (req: Request, res: Response, next: NextFuncti
                 library: {
                     where: { ...query },
                     orderBy: { game: { title: 'asc' } },
-                    include: { game: true, rating: true, beatEvents: true },
+                    include: {
+                        game: { include: { platforms: true, genres: true } },
+                        rating: true,
+                        beatEvents: true,
+                        playedPlatforms: {
+                            select: { id: true, platformId: true, platform: { select: { name: true } } },
+                        },
+                    },
                 },
             },
         });

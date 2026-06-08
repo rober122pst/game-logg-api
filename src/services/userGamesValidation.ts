@@ -84,6 +84,7 @@ export const createRatingSchema = z.object({
 });
 
 export const getUserGamesQuerySchema = z.object({
+    id: z.string().optional(),
     gameId: z.string().optional(),
 
     favorite: z

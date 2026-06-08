@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Prisma, UserGame } from '../../generated/prisma/client.ts';
-import type { DatePrecision, GameStatus } from '../../generated/prisma/enums.ts';
+import type { DatePrecision } from '../../generated/prisma/enums.ts';
 
 import { prisma } from '../prisma.ts';
 import type { createBeatEventSchema, createRatingSchema, createUserGameSchema } from './userGamesValidation.ts';
@@ -97,15 +97,14 @@ export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: P
         COMPLETED: 2,
         PLATINUM: 3,
         PERFECT: 4,
-    };
+    } as const;
 
-    let newStatus: GameStatus = 'BEATED';
+    type Action = keyof typeof actions;
 
-    if (ug.status === 'PLAYING' || ug.status === 'DROPPED' || ug.status === 'I_WILL_PLAY') {
-        newStatus = ug.status;
-    } else if (actions[eventsBody.action] > actions[ug.status as keyof typeof actions]) {
-        newStatus = eventsBody.action;
-    }
+    const currentRank = actions[ug.status as Action];
+    const nextRank = actions[eventsBody.action as Action];
+
+    const newStatus = currentRank === undefined || nextRank > currentRank ? eventsBody.action : ug.status;
 
     await tx.userGame.update({
         where: {
@@ -120,7 +119,7 @@ export async function addBeatEvent(ug: UserGame, eventsBody: AddGameEvent, tx: P
     });
 
     const events = await tx.beatEvents.createMany({
-        data: beatEvents,
+        data: beatEvents ?? [],
     });
 
     return events;

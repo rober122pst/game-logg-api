@@ -1,53 +1,52 @@
 import type { Request, Response } from 'express';
 import { generateToken } from './tokenService.ts';
-import { prisma } from '../prisma.ts';
 
 // 1. Função: Conectar Steam a conta existente
-export const connectSteamToAccount = async (req: Request, res: Response) => {
-    try {
-        const { steamId, email } = req.body;
-        
-        if (!steamId || !email) {
-            return res.status(400).json({ message: 'SteamId e email são obrigatórios' });
-        }
+// export const connectSteamToAccount = async (req: Request, res: Response) => {
+//     try {
+//         const { steamId, email } = req.body;
 
-        const user = await prisma.user.findUnique({ 
-            where: { email },
-            include: { profile: true } 
-        });
+//         if (!steamId || !email) {
+//             return res.status(400).json({ message: 'SteamId e email são obrigatórios' });
+//         }
 
-        if (!user) {
-            return res.status(404).json({ message: 'Usuário com este email não encontrado' });
-        }
+//         const user = await prisma.user.findUnique({
+//             where: { email },
+//             include: { profile: true },
+//         });
 
-        const existingSteam = await prisma.user.findUnique({ 
-            where: { steamId } 
-        });
+//         if (!user) {
+//             return res.status(404).json({ message: 'Usuário com este email não encontrado' });
+//         }
 
-        if (existingSteam && existingSteam.email !== email) {
-            return res.status(400).json({ message: 'Esta Steam já está vinculada a outra conta' });
-        }
+//         const existingSteam = await prisma.user.findUnique({
+//             where: { steamId },
+//         });
 
-        // Se tiver a função getSteamProfile, pode usa-la aqui
-        // const steamProfile = await getSteamProfile(steamId);
+//         if (existingSteam && existingSteam.email !== email) {
+//             return res.status(400).json({ message: 'Esta Steam já está vinculada a outra conta' });
+//         }
 
-        const updatedUser = await prisma.user.update({
-            where: { email },
-            data: {
-                steamId: steamId, 
-                // profile: { update: { avatar: steamProfile.avatar } }
-            }
-        });
+//         // Se tiver a função getSteamProfile, pode usa-la aqui
+//         // const steamProfile = await getSteamProfile(steamId);
 
-        console.log(`Steam conectada ao usuário ${email}: ${steamId}`);
-        const token = generateToken(updatedUser);
-        
-        return res.status(200).json({ message: 'Steam conectada com sucesso', user: updatedUser, token });
-    } catch (err: any) {
-        console.error('Erro ao conectar Steam:', err);
-        return res.status(500).json({ message: err.message });
-    }
-};
+//         const updatedUser = await prisma.user.update({
+//             where: { email },
+//             data: {
+//                 steamId: steamId,
+//                 // profile: { update: { avatar: steamProfile.avatar } }
+//             },
+//         });
+
+//         console.log(`Steam conectada ao usuário ${email}: ${steamId}`);
+//         const token = generateToken(updatedUser);
+
+//         return res.status(200).json({ message: 'Steam conectada com sucesso', user: updatedUser, token });
+//     } catch (err: Error | unknown) {
+//         console.error('Erro ao conectar Steam:', err);
+//         return res.status(500).json({ message: err.message });
+//     }
+// };
 
 // 2. Função: Autenticação via Passport (A que estava faltando!)
 export const steamAuth = (req: Request, res: Response) => {
@@ -62,7 +61,15 @@ export const steamAuth = (req: Request, res: Response) => {
         sameSite: 'strict',
     });
 
-    // Lembrete: Se for para o React Native, o CLIENT_URL idealmente deve
-    // ser um scheme de Deep Link (ex: meuapp://login?token=...) em vez de uma URL web.
     res.redirect(`${process.env.CLIENT_URL}/`);
+};
+
+// 2. Função: Autenticação via Passport (A que estava faltando!)
+export const steamMobile = (req: Request, res: Response) => {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+
+    // req.user tipicamente vem populado pelo middleware do Passport
+    const token = generateToken(req.user);
+
+    res.redirect(`${process.env.MOBILE_SCHEME}://auth/callback?token=${encodeURIComponent(token)}`);
 };

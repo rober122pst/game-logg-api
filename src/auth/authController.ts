@@ -1,14 +1,14 @@
 import type { NextFunction, Request, Response } from 'express';
 
 import bcrypt from 'bcrypt';
-import { generateToken } from './tokenService.ts';
 import { prisma } from '../prisma.ts';
+import { generateToken } from './tokenService.ts';
 
 //                    Registro via Email
 export const registerUser = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { name, email, password } = req.body;
-        if (!name || !email || !password)
+        const { username, displayName, email, password } = req.body;
+        if (!username || !email || !password || !displayName)
             return res.status(400).json({ message: 'Name, email and password are required' });
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -19,12 +19,12 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
 
         const user = await prisma.user.create({
             data: {
-                username: name,
+                username,
                 email,
                 password: passwordHash,
                 profile: {
                     create: {
-                        displayName: name,
+                        displayName,
                     },
                 },
             },

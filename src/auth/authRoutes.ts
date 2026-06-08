@@ -1,6 +1,6 @@
 import * as auth from './authController.ts';
 
-import { connectSteamToAccount, steamAuth } from './steamAuthController.ts';
+import { steamMobile } from './steamAuthController.ts';
 
 import express from 'express';
 import passport from 'passport';
@@ -20,15 +20,13 @@ router.get(
     googleAuth
 );
 
-router.post('/steam/connect', connectSteamToAccount);
-
 // Passport Steam
 router.get('/steam', passport.authenticate('steam'));
 // Callback do Steam
 router.get(
     '/steam/return',
     passport.authenticate('steam', { failureRedirect: `${process.env.CLIENT_URL}/login` }),
-    steamAuth
+    steamMobile
 );
 
 router.get('/logout', (req, res, next) => {

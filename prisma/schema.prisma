@@ -304,9 +304,9 @@ model User {
   password String?
   role     Role    @default(USER)
 
-  steamId   String? @unique
-  googleId  String? @unique
-  discordId String? @unique
+  steamId   String?
+  googleId  String?
+  discordId String?
 
   profile         Profile?
   library         UserGame[]
